@@ -1,13 +1,15 @@
-import { LandingHero } from "@/components/landing-hero";
-import { AppFooter } from "@/components/app-footer";
+"use client";
 
-export default function HomePage() {
-  return (
-    <div className="flex min-h-screen flex-col">
-      <main className="flex-1">
-        <LandingHero />
-      </main>
-      <AppFooter />
-    </div>
-  );
-}
+import { useEffect } from "react";
+import {
+  initialFoodNotifications,
+  getStoredFoodNotifications,
+  saveFoodNotifications,
+} from "@/lib/mock-data";
+
+useEffect(() => {
+  const existing = getStoredFoodNotifications();
+  if (existing.length === 0) {
+    saveFoodNotifications(initialFoodNotifications);
+  }
+}, []);
