@@ -1,6 +1,5 @@
-// lib/firebase.ts
 import { initializeApp, getApps, getApp } from "firebase/app"
-import { getFirestore } from "firebase/firestore"
+import { getFirestore, collection, addDoc } from "firebase/firestore"
 import { getStorage } from "firebase/storage"
 
 const firebaseConfig = {
@@ -13,10 +12,19 @@ const firebaseConfig = {
   measurementId: "G-JDNJGH27LG"
 };
 
-// Avoid re-initializing Firebase if already initialized
 const app = getApps().length ? getApp() : initializeApp(firebaseConfig)
-
 const db = getFirestore(app)
 const storage = getStorage(app)
 
 export { app, db, storage }
+
+export async function addDocument(collectionName: string, data: any) {
+  try {
+    const docRef = await addDoc(collection(db, collectionName), data);
+    return docRef.id;
+  } catch (error) {
+    console.error("Error adding document:", error);
+    throw error;
+  }
+}
+
