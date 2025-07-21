@@ -8,45 +8,47 @@ import { PollCard } from "@/components/poll-card"
 import { LeaderboardTable } from "@/components/leaderboard-table"
 import { KpiCard } from "@/components/dashboard/kpi-card"
 import { Locator } from "@/components/locator/locator"
-import {
-  mockMenuItems,
-  mockPolls,
-  mockMessLeaderboard,
-  getStoredFoodNotifications,
-  clearExpiredFoodNotifications,
-  getFreshnessAndRemainingTime,
-  getTodayClaimedFoodCount,
-  type FoodNotification,
-} from "@/lib/mock-data"
+import { fetchSummaryData } from "@/lib/firebase/fetch-summary-data"
 import { AppFooter } from "@/components/app-footer"
 import { ThemeToggle } from "@/components/theme-toggle"
 import Link from "next/link"
 import { ArrowLeft, UtensilsCrossed } from "lucide-react"
 
+// Remove mock-data imports
+// import { getStoredFoodNotifications, clearExpiredFoodNotifications, getFreshnessAndRemainingTime, getTodayClaimedFoodCount } from "@/lib/mock-data"
+
 export default function StudentDashboardPage() {
-  // State for mock data updates
   const [foodNotifications, setFoodNotifications] = useState<FoodNotification[]>([])
   const [menuItems, setMenuItems] = useState(mockMenuItems)
   const [polls, setPolls] = useState(mockPolls)
   const [claimedFoodToday, setClaimedFoodToday] = useState(0)
 
-  // Effect to load and refresh food notifications and claimed count
   useEffect(() => {
-    const loadData = () => {
-      clearExpiredFoodNotifications()
-      const storedNotifications = getStoredFoodNotifications()
-      // Filter out expired or claimed notifications for display
-      const activeNotifications = storedNotifications.filter(
-        (n) => !getFreshnessAndRemainingTime(n.createdAt).isExpired && !n.isClaimed,
-      )
+    const loadData = async () => {
+      const allNotifications = await fetchSummaryData()
+
+      const activeNotifications = allNotifications.filter((n) => {
+        const createdAt = new Date(n.timestamp)
+        const now = new Date()
+        const diffMinutes = (now.getTime() - createdAt.getTime()) / (1000 * 60)
+        return diffMinutes <= 60 && !n.isClaimed
+      })
+
       setFoodNotifications(activeNotifications)
-      setClaimedFoodToday(getTodayClaimedFoodCount())
+
+      // Optional: count claimed today if your schema supports it
+      const claimedCount = allNotifications.filter((n) => {
+        const createdAt = new Date(n.timestamp)
+        const now = new Date()
+        const isToday = createdAt.toDateString() === now.toDateString()
+        return isToday && n.isClaimed
+      }).length
+
+      setClaimedFoodToday(claimedCount)
     }
 
     loadData()
-
     const interval = setInterval(loadData, 5000)
-
     return () => clearInterval(interval)
   }, [])
 
@@ -57,7 +59,8 @@ export default function StudentDashboardPage() {
           ? {
               ...item,
               totalRatings: item.totalRatings + 1,
-              averageRating: (item.averageRating * item.totalRatings + rating) / (item.totalRatings + 1),
+              averageRating:
+                (item.averageRating * item.totalRatings + rating) / (item.totalRatings + 1),
             }
           : item,
       ),
@@ -81,11 +84,8 @@ export default function StudentDashboardPage() {
   }
 
   const handleFoodClaimed = () => {
-    clearExpiredFoodNotifications()
-    setFoodNotifications(
-      getStoredFoodNotifications().filter((n) => !getFreshnessAndRemainingTime(n.createdAt).isExpired && !n.isClaimed),
-    )
-    setClaimedFoodToday(getTodayClaimedFoodCount())
+    setFoodNotifications((prev) => prev.filter((n) => n.isClaimed !== true))
+    setClaimedFoodToday((prev) => prev + 1)
   }
 
   return (
@@ -100,6 +100,7 @@ export default function StudentDashboardPage() {
         </div>
         <ThemeToggle />
       </header>
+
       <main className="flex-1 p-4 md:p-6">
         <Tabs defaultValue="notifications" className="w-full">
           <TabsList className="grid w-full grid-cols-2 sm:grid-cols-3 lg:grid-cols-5">
@@ -109,6 +110,7 @@ export default function StudentDashboardPage() {
             <TabsTrigger value="leaderboard">Mess Leaderboard</TabsTrigger>
             <TabsTrigger value="hostel-locator">Hostel Locator</TabsTrigger>
           </TabsList>
+
           <TabsContent value="notifications" className="mt-6">
             <h2 className="mb-4 text-2xl font-bold">Food Notifications</h2>
             <div className="mb-6">
@@ -123,7 +125,11 @@ export default function StudentDashboardPage() {
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
               {foodNotifications.length > 0 ? (
                 foodNotifications.map((notification) => (
-                  <FoodNotificationCard key={notification.id} notification={notification} onClaim={handleFoodClaimed} />
+                  <FoodNotificationCard
+                    key={notification.id}
+                    notification={notification}
+                    onClaim={handleFoodClaimed}
+                  />
                 ))
               ) : (
                 <p className="col-span-full text-center text-muted-foreground">
@@ -132,6 +138,7 @@ export default function StudentDashboardPage() {
               )}
             </div>
           </TabsContent>
+
           <TabsContent value="rate-menu" className="mt-6">
             <h2 className="mb-4 text-2xl font-bold">Rate the Menu</h2>
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -140,6 +147,7 @@ export default function StudentDashboardPage() {
               ))}
             </div>
           </TabsContent>
+
           <TabsContent value="poll-center" className="mt-6">
             <h2 className="mb-4 text-2xl font-bold">Poll Center</h2>
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -148,13 +156,15 @@ export default function StudentDashboardPage() {
               ))}
             </div>
           </TabsContent>
+
           <TabsContent value="leaderboard" className="mt-6">
             <h2 className="mb-4 text-2xl font-bold">Mess Leaderboard</h2>
             <LeaderboardTable data={mockMessLeaderboard} />
           </TabsContent>
+
           <TabsContent value="hostel-locator" className="mt-6">
             <h2 className="mb-4 text-2xl font-bold">Nearest Hostel Locator</h2>
-            <Locator foodNotifications={foodNotifications} /> {/* Pass foodNotifications */}
+            <Locator foodNotifications={foodNotifications} />
           </TabsContent>
         </Tabs>
       </main>
