@@ -1,5 +1,5 @@
-import { LandingHero } from "@/components/landing-hero"
-import { AppFooter } from "@/components/app-footer"
+import { LandingHero } from "@/components/landing-hero";
+import { AppFooter } from "@/components/app-footer";
 
 export default function HomePage() {
   return (
@@ -9,5 +9,5 @@ export default function HomePage() {
       </main>
       <AppFooter />
     </div>
-  )
+  );
 }
